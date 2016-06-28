@@ -60,29 +60,25 @@ if __name__ == "__main__":
     args = parse_args()
     datapath = Path(args.dataset_path)
     samplepath = Path(args.sample_path)
+    patches = []
+    with tf.Session() as sess:
+	for folder in datapath.dirs()[:1]:
+	    print folder.name
+	    for img in folder.files():
+		id = get_image_id(img.name)
+		print id
+		image = plt.imread(img)
+		centers = np.load(samplepath + folder.name + "/" + id + ".npy").T
+		for center in centers:
+		    patch = utils.load_image(create_patch(image, center, 80, sess)).reshape((1, 224, 224, 3))
+                    patches.append(patch)
+	batch = np.concatenate(patches) 
+        images = tf.placeholder("float", [batch.shape[0], 224, 224, 3])
+	feed_dict = {images: batch}
 
-    with tf.Session(
-            config=tf.ConfigProto(gpu_options=(tf.GPUOptions(per_process_gpu_memory_fraction=0.7)))) as sess:
-        batches = []
-        for folder in datapath.dirs()[:1]:
-            print folder.name
-            for img in folder.files():
-                id = get_image_id(img.name)
-                print id
-                image = plt.imread(img)
-                centers = np.load(samplepath + folder.name + "/" + id + ".npy").T
-                patches = [create_patch(image, center, 80, sess) for center in centers]
-                for patch in patches:
-                    batches.append(utils.load_image(patch))
-        batch = batches[0].reshape((1, 224, 224, 3))
-        for b in batches[1:]:
-            batch = np.concatenate((batch, b.reshape((1, 224, 224, 3))), 0)
-            images = tf.placeholder("float", [batch.shape[0], 224, 224, 3])
-        feed_dict = {images: batch}
+	vgg = vgg16.Vgg16()
+	with tf.name_scope("content_vgg"):
+	    vgg.build(images)
 
-        vgg = vgg16.Vgg16()
-        with tf.name_scope("content_vgg"):
-            vgg.build(images)
-
-        prob = sess.run(vgg.prob, feed_dict=feed_dict)
+	prob = sess.run(vgg.prob, feed_dict=feed_dict)
 
