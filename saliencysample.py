@@ -10,7 +10,7 @@ def parse_args():
                            default="../../tianyiwu/saliency-2016-cvpr/saliency_map/")
     argparser.add_argument("--image_path", default="images/")
     argparser.add_argument("--save_path",
-                           default="saliency_map_samples/")
+                           default="saliency_map_samples/samples10/")
     return argparser.parse_args()
 
 
@@ -34,6 +34,7 @@ def get_image_id(imagename):
 def save_sample(rows, cols, savepath):
     coords = np.vstack((rows, cols))
     np.save(savepath, coords)
+    return coords
 
 
 def plot_and_save_sample(imagepath, rows, cols, savepath):
@@ -44,17 +45,26 @@ def plot_and_save_sample(imagepath, rows, cols, savepath):
     scat.remove()
 
 
+def sample_in_bounds(center, patch_size, size=(240, 320)):
+    row, col = center
+    if row - patch_size / 2 < 0 or row + patch_size / 2 > size[0] or col - patch_size / 2 < 0 or col + patch_size / 2 > size[1]:
+        return False
+    else:
+        return True
+
 if __name__ == "__main__":
     args = parse_args()
     datapath = Path(args.dataset_path)
     savepath = Path(args.save_path)
+    num_samples = 0
+    num_out = 0
     for species in datapath.dirs():
         print species
         speciespath = Path(savepath + species.name)
         if not speciespath.exists():
             speciespath.mkdir()
         for img in species.files():
-            with open(savepath + "finishedsamples.txt", "r") as f:
+            with open(savepath + "finishedsamples10.txt", "r") as f:
                 text = f.read()
                 finished = set(text.split("\n"))
             id = get_image_id(img.name)
@@ -64,10 +74,13 @@ if __name__ == "__main__":
                 continue
             saliency_map = plt.imread(img)
             saliency_map = normalize(saliency_map)
-            rows, cols = sample(saliency_map, 20)
+            rows, cols = sample(saliency_map, 10)
             coordssavepath = Path(speciespath + "/" + id + ".npy")
-            # imgsavepath = Path(speciespath + "/" + id + ".png")
-            save_sample(rows, cols, coordssavepath)
-            # plot_and_save_sample(img, rows, cols, imgsavepath)
-            with open(savepath + "finishedsamples.txt", "a") as f:
+            centers = save_sample(rows, cols, coordssavepath).T
+            # for center in centers:
+                # num_samples += 1
+                # if not sample_in_bounds((center[0], center[1]), 80):
+                    # num_out += 1
+            with open(savepath + "finishedsamples10.txt", "a") as f:
                 f.write(id + "\n")
+    # print num_out, num_samples

@@ -1,16 +1,15 @@
 from matplotlib import pyplot as plt
-from matplotlib import image as mpimg
 from argparse import ArgumentParser
-from PIL import Image
 from path import Path
 from scipy import misc
+from PIL import Image
 import numpy as np
 
 def parse_args():
     argparser = ArgumentParser()
-    argparser.add_argument("--dataset_path", default="datasets/nabirdsresized/")
+    argparser.add_argument("--dataset_path", default="../../yashu/datasets/nabirds/images/")
     argparser.add_argument("--image_path", default="")
-    argparser.add_argument("--save_path", default="datasets/nabirdspreprocessed/")
+    argparser.add_argument("--save_path", default="datasets/nabirdsresized/")
     return argparser.parse_args()
 
 
@@ -29,6 +28,17 @@ if __name__ == "__main__":
     print len(imgpath.dirs())
     i = 0
     image_sum = 0
+    # for species in imgpath.dirs():
+        # print species.name
+        # if not Path(savepath + species.name).exists():
+                # print "Making new directory..."
+                # newdir = savepath + species.name
+                # newdir.mkdir()
+        # for img in species.files():
+            # i += 1
+            # image = misc.imread(img)
+            # image_sum += image.mean()
+    # mean = image_sum * 1.0 / i
     for species in imgpath.dirs():
         print species.name
         if not Path(savepath + species.name).exists():
@@ -36,20 +46,11 @@ if __name__ == "__main__":
                 newdir = savepath + species.name
                 newdir.mkdir()
         for img in species.files():
-            i += 1
-            image = misc.imread(img)
-            image_sum += image.mean()
-    mean = image_sum * 1.0 / i
-    print "Number of images: %d", i
-    print "Sum of images: %s", image_sum
-    print "Mean: %f", mean
-    for species in imgpath.dirs():
-        for img in species.files():
             print img.name
-            image = misc.imread(img)
-            image = image.astype(float)
-            image -= mean
-            misc.imsave(savepath + species.name + "/" + img.name, image)
-            # image = Image.open(img)
-            # image = image.resize((240, 320), Image.ANTIALIAS)
-            # image.save(savepath + species.name + "/" + img.name)
+            # image = misc.imread(img)
+            # image = image.astype(float)
+            # image -= mean
+            # np.save(savepath + species.name + "/" + img.name, image)
+            image = Image.open(img)
+            image = image.resize((320, 240), Image.ANTIALIAS)
+            image.save(savepath + species.name + "/" + img.name)
