@@ -93,7 +93,7 @@ if __name__ == "__main__":
 	opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
 	grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
 	train_op = opt.apply_gradients(grads_and_vars)
-        sess.run(init_op)
+	sess.run(init_op)
         for img_id in image_paths.keys():
 	    patches = []
 	    patch_ids = []
