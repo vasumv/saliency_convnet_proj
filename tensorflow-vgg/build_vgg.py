@@ -67,7 +67,7 @@ def create_labels(patch_ids):
     labels = [] 
     for id in patch_ids: 
 	labels.append(int(image_labels[id]))
-    return tf.convert_to_tensor(labels)
+    return labels
 
 if __name__ == "__main__":
     args = parse_args()
@@ -76,8 +76,23 @@ if __name__ == "__main__":
     savepath = Path(args.save_path)
     train_images, test_images = load_train_test_split()
     image_paths = load_image_paths()
+    batch_size = 10
     with tf.Session() as sess:
         vgg = vgg16.Vgg16(555, 80)
+	images = tf.placeholder("float", [batch_size, 224, 224, 3])
+	with tf.name_scope("content_vgg"):
+	     vgg.build(images)
+	conv_6 = vgg.conv3_2
+	fc = vgg.fc_layer(conv_6, "fc1", True)
+	logits = vgg.softmax_layer(fc, "softmax1", True)
+	labels_placeholder = tf.placeholder(tf.int32, [batch_size])
+        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+		logits, labels_placeholder, name='xentropy')
+	loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
+	opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
+	grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
+	train_op = opt.apply_gradients(grads_and_vars)
+	print logits.get_shape()
         for img_id in image_paths.keys():
 	    patches = []
 	    patch_ids = []
@@ -91,19 +106,6 @@ if __name__ == "__main__":
 		patch_ids.append(img_id)
 	    batch = np.concatenate(patches) 
             print "Batch shape: ", batch.shape
-	    images = tf.placeholder("float", [batch.shape[0], 224, 224, 3])
-	    feed_dict = {images: batch}
 	    labels = create_labels(patch_ids)
-	    with tf.name_scope("content_vgg"):
-	        vgg.build(images)
-
-	    conv_6 = vgg.conv3_2
-	    fc = vgg.fc_layer(conv_6, "fc1", True)
-	    logits = vgg.softmax_layer(fc, "softmax1", True)
-	    print logits.get_shape()
-	    opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
-	    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-		    logits, labels, name='xentropy')
-	    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
-	    grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
-	    opt.apply_gradients(grads_and_vars)
+	    feed_dict = {images: batch, labels_placeholder: labels}
+	    sess.run(train_op, feed_dict=feed_dict)

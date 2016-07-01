@@ -15,7 +15,6 @@ class Vgg16:
             path = os.path.abspath(os.path.join(path, os.pardir))
             path = os.path.join(path, "vgg16.npy")
             vgg16_npy_path = path
-            print path
 	self.num_classes = num_classes
 	self.patch_size = patch_size
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
@@ -27,7 +26,6 @@ class Vgg16:
 
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
         """
-
         start_time = time.time()
         print("build model started")
         rgb_scaled = rgb * 255.0
@@ -78,7 +76,7 @@ class Vgg16:
 
         self.prob = tf.nn.softmax(self.fc8, name="prob")
 
-        self.data_dict = None
+        #self.data_dict = None
         print("build model finished: %ds" % (time.time() - start_time))
 
     def avg_pool(self, bottom, name):
