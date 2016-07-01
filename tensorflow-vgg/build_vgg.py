@@ -76,10 +76,10 @@ if __name__ == "__main__":
     savepath = Path(args.save_path)
     train_images, test_images = load_train_test_split()
     image_paths = load_image_paths()
-    patches = []
-    patch_ids = []
     with tf.Session() as sess:
         for img_id in image_paths.keys():
+	    patches = []
+	    patch_ids = []
 	    print img_id
 	    image = plt.imread(datapath + Path(image_paths[img_id]))
 	    centers = np.load(samplepath + image_paths[img_id].split(".")[0] + ".npy").T
