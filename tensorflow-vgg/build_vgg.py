@@ -1,0 +1,109 @@
+from argparse import ArgumentParser
+from matplotlib import pyplot as plt
+import tensorflow as tf
+from path import Path
+from nabirds import load_image_labels, load_train_test_split, load_image_paths
+import numpy as np
+import vgg16
+import utils
+
+def parse_args():
+    argparser = ArgumentParser()
+    argparser.add_argument("--dataset_path", default="../datasets/nabirdsresized/")
+    argparser.add_argument("--sample_path", default="../saliency_map_samples/samples10/")
+    argparser.add_argument("--save_path", default="patches/")
+    return argparser.parse_args()
+
+
+def create_patch(image, center, patch_size):
+
+    x1 = center[1] - patch_size / 2
+    y1 = center[0] - patch_size / 2
+    x_diff = 0
+    y_diff = 0
+    offset_width = x1
+    offset_height = y1
+    if x1 < 0 or x1 + patch_size > image.shape[1] or y1 < 0 or y1 + patch_size > image.shape[0]:
+        pad_width = 0
+        pad_height = 0
+        if x1 < 0:
+            offset_width = 0
+            x_diff = x1
+            pad_width = -x1
+        elif x1 + patch_size > image.shape[1]:
+            offset_width = x1
+            x_diff = image.shape[1] - (x1 + patch_size)
+            pad_width = 0
+        if y1 < 0:
+            offset_height = 0
+            y_diff = y1
+            pad_height = -y1
+        elif y1 + patch_size > image.shape[0]:
+            offset_height = y1
+            y_diff = image.shape[0] - (y1 + patch_size)
+            pad_height = 0
+        crop_image = tf.image.crop_to_bounding_box(image, offset_height,
+                                                   offset_width,
+                                                   patch_size + y_diff,
+                                                   patch_size + x_diff)
+        pad_image = tf.image.pad_to_bounding_box(crop_image, pad_height,
+                                                 pad_width, patch_size,
+                                                 patch_size)
+        return pad_image
+    else:
+        return tf.image.crop_to_bounding_box(image,
+                                             offset_height, offset_width,
+                                             patch_size, patch_size)
+
+def get_image_id(label_id):
+    return label_id.replace("-", "")
+    
+def get_label_id(image_id):
+    label_id = image_id[:8] + "-" + image_id[8:12] + "-" + image_id[12:16] + "-" + image_id[16:20] + "-" + image_id[20:]
+    return label_id 
+
+def create_labels(patch_ids):
+    image_labels = load_image_labels()
+    labels = [] 
+    for id in patch_ids: 
+	labels.append(int(image_labels[id]))
+    return tf.convert_to_tensor(labels)
+
+if __name__ == "__main__":
+    args = parse_args()
+    datapath = Path(args.dataset_path)
+    samplepath = Path(args.sample_path)
+    savepath = Path(args.save_path)
+    train_images, test_images = load_train_test_split()
+    image_paths = load_image_paths()
+    patches = []
+    patch_ids = []
+    with tf.Session() as sess:
+        for img_id in image_paths.keys():
+	    print img_id
+	    image = plt.imread(datapath + Path(image_paths[img_id]))
+	    centers = np.load(samplepath + image_paths[img_id].split(".")[0] + ".npy").T
+	    for i in range(len(centers)):
+                patch = create_patch(image, centers[i], 80).eval()
+		patch = utils.load_image(patch).reshape((1, 224, 224, 3))
+		patches.append(patch)
+		patch_ids.append(img_id)
+	    batch = np.concatenate(patches) 
+	    images = tf.placeholder("float", [batch.shape[0], 224, 224, 3])
+	    feed_dict = {images: batch}
+	    labels = create_labels(patch_ids)
+	    vgg = vgg16.Vgg16(555, 80)
+	    with tf.name_scope("content_vgg"):
+	        vgg.build(images)
+
+	    sess.run(vgg.prob, feed_dict=feed_dict)
+	    conv_6 = vgg.conv3_2
+	    fc = vgg.fc_layer(conv_6, "fc1", True)
+	    logits = vgg.softmax_layer(fc, "softmax1", True)
+	    print logits.get_shape()
+	    opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
+	    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+		    logits, labels, name='xentropy')
+	    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
+	    grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
+	    opt.apply_gradients(grads_and_vars)

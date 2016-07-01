@@ -9,14 +9,15 @@ VGG_MEAN = [103.939, 116.779, 123.68]
 
 
 class Vgg16:
-    def __init__(self, vgg16_npy_path=None):
+    def __init__(self, num_classes, patch_size, vgg16_npy_path=None):
         if vgg16_npy_path is None:
             path = inspect.getfile(Vgg16)
             path = os.path.abspath(os.path.join(path, os.pardir))
             path = os.path.join(path, "vgg16.npy")
             vgg16_npy_path = path
             print path
-
+	self.num_classes = num_classes
+	self.patch_size = patch_size
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
         print("npy file loaded")
 
@@ -98,22 +99,37 @@ class Vgg16:
             relu = tf.nn.relu(bias)
             return relu
 
-    def fc_layer(self, bottom, name):
+    def fc_layer(self, bottom, name, initialize=False):
         with tf.variable_scope(name):
             shape = bottom.get_shape().as_list()
             dim = 1
             for d in shape[1:]:
                 dim *= d
             x = tf.reshape(bottom, [-1, dim])
-
-            weights = self.get_fc_weight(name)
-            biases = self.get_bias(name)
+            if not initialize:
+                weights = self.get_fc_weight(name)
+                biases = self.get_bias(name)
+            else:
+                weights = tf.Variable(tf.random_normal([dim, self.patch_size * self.patch_size]), name + "_weights")
+                biases = tf.Variable(tf.random_normal([self.patch_size * self.patch_size]), name + "_bias")
 
             # Fully connected layer. Note that the '+' operation automatically
             # broadcasts the biases.
             fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
 
             return fc
+
+    def softmax_layer(self, bottom, name, initialize=False):
+        shape = bottom.get_shape().as_list()
+	print shape
+        if not initialize:
+            weights = self.get_fc_weight(name)
+            biases = self.get_bias(name)
+        else:
+            weights = tf.Variable(tf.random_normal([self.patch_size * self.patch_size, self.num_classes]), name + "_weights")
+            biases = tf.Variable(tf.random_normal([self.num_classes]), name + "_bias")
+       	softmax = tf.nn.softmax(tf.matmul(bottom, weights) + biases) 
+	return softmax
 
     def get_conv_filter(self, name):
         return tf.constant(self.data_dict[name][0], name="filter")
