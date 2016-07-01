@@ -77,6 +77,7 @@ if __name__ == "__main__":
     train_images, test_images = load_train_test_split()
     image_paths = load_image_paths()
     with tf.Session() as sess:
+        vgg = vgg16.Vgg16(555, 80)
         for img_id in image_paths.keys():
 	    patches = []
 	    patch_ids = []
@@ -89,14 +90,13 @@ if __name__ == "__main__":
 		patches.append(patch)
 		patch_ids.append(img_id)
 	    batch = np.concatenate(patches) 
+            print "Batch shape: ", batch.shape
 	    images = tf.placeholder("float", [batch.shape[0], 224, 224, 3])
 	    feed_dict = {images: batch}
 	    labels = create_labels(patch_ids)
-	    vgg = vgg16.Vgg16(555, 80)
 	    with tf.name_scope("content_vgg"):
 	        vgg.build(images)
 
-	    sess.run(vgg.prob, feed_dict=feed_dict)
 	    conv_6 = vgg.conv3_2
 	    fc = vgg.fc_layer(conv_6, "fc1", True)
 	    logits = vgg.softmax_layer(fc, "softmax1", True)
