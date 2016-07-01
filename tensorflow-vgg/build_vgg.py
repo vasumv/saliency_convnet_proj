@@ -62,8 +62,7 @@ def get_label_id(image_id):
     label_id = image_id[:8] + "-" + image_id[8:12] + "-" + image_id[12:16] + "-" + image_id[16:20] + "-" + image_id[20:]
     return label_id 
 
-def create_labels(patch_ids):
-    image_labels = load_image_labels()
+def create_labels(patch_ids, image_labels):
     labels = [] 
     for id in patch_ids: 
 	labels.append(int(image_labels[id]))
@@ -76,8 +75,10 @@ if __name__ == "__main__":
     savepath = Path(args.save_path)
     train_images, test_images = load_train_test_split()
     image_paths = load_image_paths()
+    image_labels = load_image_labels()
     batch_size = 10
     with tf.Session() as sess:
+	init_op = tf.initialize_all_variables()
         vgg = vgg16.Vgg16(555, 80)
 	images = tf.placeholder("float", [batch_size, 224, 224, 3])
 	with tf.name_scope("content_vgg"):
@@ -92,7 +93,7 @@ if __name__ == "__main__":
 	opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
 	grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
 	train_op = opt.apply_gradients(grads_and_vars)
-	print logits.get_shape()
+        sess.run(init_op)
         for img_id in image_paths.keys():
 	    patches = []
 	    patch_ids = []
@@ -106,6 +107,6 @@ if __name__ == "__main__":
 		patch_ids.append(img_id)
 	    batch = np.concatenate(patches) 
             print "Batch shape: ", batch.shape
-	    labels = create_labels(patch_ids)
-	    feed_dict = {images: batch, labels_placeholder: labels}
-	    sess.run(train_op, feed_dict=feed_dict)
+	    labels = create_labels(patch_ids, image_labels)
+	    feeddict = {images: batch, labels_placeholder: labels}
+	    sess.run(train_op, feed_dict=feeddict)
