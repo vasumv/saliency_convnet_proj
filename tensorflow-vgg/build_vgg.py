@@ -77,21 +77,26 @@ if __name__ == "__main__":
     image_paths = load_image_paths()
     image_labels = load_image_labels()
     batch_size = 10
-    with tf.Session() as sess:
-	init_op = tf.initialize_all_variables()
-        vgg = vgg16.Vgg16(555, 80)
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
+	vgg = vgg16.Vgg16(555, 80)
 	images = tf.placeholder("float", [batch_size, 224, 224, 3])
 	with tf.name_scope("content_vgg"):
 	     vgg.build(images)
-	conv_6 = vgg.conv3_2
-	fc = vgg.fc_layer(conv_6, "fc1", True)
+	conv_12 = vgg.conv5_2
+	print "POOL 2", vgg.pool2
+	print "POOL 5", vgg.pool5
+	print "CONV 12: ", conv_12
+	fc = vgg.fc_layer(conv_12, "fc1", True)
 	logits = vgg.softmax_layer(fc, "softmax1", True)
 	labels_placeholder = tf.placeholder(tf.int32, [batch_size])
-        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+	cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
 		logits, labels_placeholder, name='xentropy')
 	loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
 	opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
 	grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
+	init_op = tf.initialize_all_variables()
 	train_op = opt.apply_gradients(grads_and_vars)
 	sess.run(init_op)
         for img_id in image_paths.keys():
