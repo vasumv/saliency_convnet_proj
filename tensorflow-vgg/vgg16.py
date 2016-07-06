@@ -108,8 +108,8 @@ class Vgg16:
                 weights = self.get_fc_weight(name)
                 biases = self.get_bias(name)
             else:
-                weights = tf.Variable(tf.random_normal([dim, self.patch_size * self.patch_size]), name + "_weights")
-                biases = tf.Variable(tf.random_normal([self.patch_size * self.patch_size]), name + "_bias")
+                weights = tf.Variable(tf.truncated_normal([dim, 512]), name + "_weights")
+                biases = tf.Variable(tf.truncated_normal([512]), name + "_bias")
 
             # Fully connected layer. Note that the '+' operation automatically
             # broadcasts the biases.
@@ -124,8 +124,8 @@ class Vgg16:
             weights = self.get_fc_weight(name)
             biases = self.get_bias(name)
         else:
-            weights = tf.Variable(tf.random_normal([self.patch_size * self.patch_size, self.num_classes]), name + "_weights")
-            biases = tf.Variable(tf.random_normal([self.num_classes]), name + "_bias")
+            weights = tf.Variable(tf.truncated_normal([512, self.num_classes]), name + "_weights")
+            biases = tf.Variable(tf.truncated_normal([self.num_classes]), name + "_bias")
        	softmax = tf.nn.softmax(tf.matmul(bottom, weights) + biases) 
 	return softmax
 
