@@ -62,24 +62,37 @@ def get_label_id(image_id):
     label_id = image_id[:8] + "-" + image_id[8:12] + "-" + image_id[12:16] + "-" + image_id[16:20] + "-" + image_id[20:]
     return label_id 
 
-def create_labels(patch_ids, image_labels):
-    labels = [] 
-    for id in patch_ids: 
+def create_labels(patch_ids, image_labels, num_classes):
+    labels = []
+    for i in range(len(patch_ids)): 
+	id = patch_ids[i]
+        label_row = [0] * num_classes
+	label_row[int(image_labels[id])] = 1
+	labels.append(np.array(label_row))
+    return np.vstack(labels) 
+
+def create_sparse_labels(patch_ids, image_labels, num_classes):
+    labels = []
+    for i in range(len(patch_ids)): 
+	id = patch_ids[i]
 	labels.append(int(image_labels[id]))
-    return labels
+    print len(labels)
+    return np.array(labels) 
 
 if __name__ == "__main__":
     args = parse_args()
     datapath = Path(args.dataset_path)
     samplepath = Path(args.sample_path)
+    num_patches = 10
+    num_epochs = 3
+    num_classes = 555
     savepath = Path(args.save_path)
     train_images, test_images = load_train_test_split()
     image_paths = load_image_paths()
     image_labels = load_image_labels()
     batch_size = 30
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
 
-    with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
+    with tf.Session(config=tf.ConfigProto()) as sess:
 	vgg = vgg16.Vgg16(555, 80)
 	images = tf.placeholder("float", [batch_size, 224, 224, 3])
 	with tf.name_scope("content_vgg"):
@@ -87,35 +100,37 @@ if __name__ == "__main__":
 	conv_6 = vgg.conv3_2
 	conv_9 = vgg.conv4_2
 	conv_12 = vgg.conv5_2
-	print conv_6
-	print conv_9
-	print conv_12
-	fc = vgg.fc_layer(conv_6, "fc1", True)
-	logits = vgg.softmax_layer(fc, "softmax1", True)
-	labels_placeholder = tf.placeholder(tf.int32, [batch_size])
-	cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-		logits, labels_placeholder, name='xentropy')
-	loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
-	opt = tf.train.GradientDescentOptimizer(learning_rate=0.1)
-	grads_and_vars = opt.compute_gradients(loss, var_list=tf.trainable_variables())
+	batch_cnt = tf.Variable(0, trainable=False)
+	starter_learning_rate = 0.000001
+	epoch_num = len(train_images) * num_patches
+	learning_rate = tf.train.exponential_decay(starter_learning_rate, batch_cnt,
+                                           epoch_num, 0.9, staircase=True)
+	fc = vgg.fc_layer(conv_12, "fc1", True)
+	labels_placeholder = tf.placeholder(tf.float32, [batch_size, num_classes])
+	loss, logits = vgg.softmax_layer(fc, labels_placeholder,"softmax1", True)
+	train_op = tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step=batch_cnt)
 	init_op = tf.initialize_all_variables()
-	train_op = opt.apply_gradients(grads_and_vars)
         training_paths = [x for x in image_paths.keys() if x in train_images]
 	sess.run(init_op)
-        for i in range(0, len(training_paths), 3):
-	    patches = []
-	    patch_ids = []
-	    for img_id in training_paths[i:i+3]:
-                print img_id
-	        image = plt.imread(datapath + Path(image_paths[img_id]))
-	        centers = np.load(samplepath + image_paths[img_id].split(".")[0] + ".npy").T
-	        for i in range(len(centers)):
-                    patch = create_patch(image, centers[i], 80).eval()
-		    patch = utils.load_image(patch).reshape((1, 224, 224, 3))
-		    patches.append(patch)
-		    patch_ids.append(img_id)
-            batch = np.concatenate(patches) 
-            print "Batch shape: ", batch.shape
-	    labels = create_labels(patch_ids, image_labels)
-	    feed_dict = {images: batch, labels_placeholder: labels}
-	    sess.run(train_op, feed_dict=feed_dict)
+	for i in range(num_epochs):
+	    for i in range(0, len(training_paths), 3):
+	    	patches = []
+	    	patch_ids = []
+	    	for img_id in training_paths[i:i+3]:
+		    print img_id
+		    image = plt.imread(datapath + Path(image_paths[img_id]))
+		    centers = np.load(samplepath + image_paths[img_id].split(".")[0] + ".npy").T
+		    for i in range(len(centers)):
+		        patch = create_patch(image, centers[i], 80).eval()
+		        patch = utils.load_image(patch).reshape((1, 224, 224, 3))
+		        patches.append(patch)
+		        patch_ids.append(img_id)
+	        batch = np.concatenate(patches) 
+	        labels = create_labels(patch_ids, image_labels, num_classes)
+	        feed_dict = {images: batch, labels_placeholder: labels}
+                train_op.run(feed_dict=feed_dict)
+	        cost, softmax = sess.run(fetches=[loss, logits], feed_dict=feed_dict)
+		nonzeroes = np.flatnonzero(labels)
+		for value in nonzeroes:
+		    print np.ndarray.flatten(softmax)[value]
+		print cost

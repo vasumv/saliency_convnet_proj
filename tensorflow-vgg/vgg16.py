@@ -117,17 +117,18 @@ class Vgg16:
 
             return fc
 
-    def softmax_layer(self, bottom, name, initialize=False):
+    def softmax_layer(self, bottom, Y, name, initialize=False):
         shape = bottom.get_shape().as_list()
 	print shape
         if not initialize:
             weights = self.get_fc_weight(name)
             biases = self.get_bias(name)
         else:
-            weights = tf.Variable(tf.truncated_normal([512, self.num_classes]), name + "_weights")
-            biases = tf.Variable(tf.truncated_normal([self.num_classes]), name + "_bias")
+            weights = tf.Variable(tf.truncated_normal([512, self.num_classes], stddev=0.01), name + "_weights")
+            biases = tf.Variable(tf.truncated_normal([self.num_classes], stddev=0.01), name + "_bias")
+	cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(tf.matmul(bottom, weights) + biases, Y))
        	softmax = tf.nn.softmax(tf.matmul(bottom, weights) + biases) 
-	return softmax
+	return cost, softmax
 
     def get_conv_filter(self, name):
         return tf.constant(self.data_dict[name][0], name="filter")
