@@ -48,7 +48,7 @@ oneconf==0.3.7.14.4.1
 path.py==8.2.1
 pexpect==4.1.0
 pickleshare==0.7.2
-Pillow==3.2.0
+Pillow==9.0.0
 piston-mini-client==0.7.5
 plainbox==0.5.3
 protobuf==3.0.0b2
